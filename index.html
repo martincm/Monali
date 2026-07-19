@@ -5,25 +5,25 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Sistema de Gestión</title>
     <style>
-        body, html { 
-            margin: 0; 
-            padding: 0; 
-            height: 100%; 
-            background-color: #f4f4f9; 
-            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; 
+        body, html {
+            margin: 0;
+            padding: 0;
+            height: 100%;
+            background-color: #f4f4f9;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
         }
-        iframe { 
-            width: 100%; 
-            height: 100%; 
-            border: none; 
+        iframe {
+            width: 100%;
+            height: 100%;
+            border: none;
             display: none; /* Oculto hasta que pongan la clave */
-        } 
-        .login-container { 
-            display: flex; 
-            flex-direction: column; 
-            align-items: center; 
-            justify-content: center; 
-            height: 100vh; 
+        }
+        .login-container {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            height: 100vh;
         }
         .login-box {
             background: white;
@@ -35,35 +35,34 @@
             width: 100%;
         }
         h3 { margin-top: 0; color: #333; }
-        input { 
-            width: 85%; 
-            padding: 12px; 
-            margin: 10px 0; 
-            font-size: 16px; 
-            border-radius: 5px; 
-            border: 1px solid #ccc; 
+        input {
+            width: 85%;
+            padding: 12px;
+            margin: 10px 0;
+            font-size: 16px;
+            border-radius: 5px;
+            border: 1px solid #ccc;
             outline: none;
         }
-        button { 
+        button {
             width: 93%;
-            padding: 12px; 
-            font-size: 16px; 
+            padding: 12px;
+            font-size: 16px;
             font-weight: bold;
-            border-radius: 5px; 
+            border-radius: 5px;
             background-color: #546E7A;    /* Nuevo color */
-            color: white; 
-            cursor: pointer; 
-            border: none; 
+            color: white;
+            cursor: pointer;
+            border: none;
             transition: background 0.2s;
         }
-        button:hover { 
+        button:hover {
             background-color: #3f4f5f;    /* Tono más oscuro para el hover */
         }
         .error-msg { color: red; font-size: 14px; margin-top: 10px; display: none; }
     </style>
 </head>
 <body>
-
     <div id="login" class="login-container">
         <div class="login-box">
             <h3>Sistema de Gestión</h3>
@@ -75,19 +74,23 @@
             <div id="error" class="error-msg">Contraseña incorrecta</div>
         </div>
     </div>
-
-    <iframe id="app" src="https://script.google.com/macros/s/AKfycbxZY420VyRMw1saj0SrDaugcl8VKAcAu1FCrGPKclAZssPTlonOUwTg82Gr61gVvJEn5w/exec"></iframe>
-
+    <!--
+      Se agregó el atributo "allow" para delegar permiso de micrófono (y de
+      reconocimiento de voz) al contenido embebido del formulario. Sin esto,
+      el navegador bloquea getUserMedia/SpeechRecognition dentro del iframe
+      aunque el usuario haya aceptado el permiso en Safari.
+    -->
+    <iframe id="app" src="https://script.google.com/macros/s/AKfycbxZY420VyRMw1saj0SrDaugcl8VKAcAu1FCrGPKclAZssPTlonOUwTg82Gr61gVvJEn5w/exec" allow="microphone *; speech-recognition *"></iframe>
     <script>
         function validar() {
             // ========================================================
             //  CAMBIA EL TEXTO DE ABAJO POR LA CLAVE QUE TÚ QUIERAS
             // ========================================================
-            var claveCorrecta = "asd"; 
-            
+            var claveCorrecta = "asd";
+
             var input = document.getElementById("pass").value;
             var errorDiv = document.getElementById("error");
-            
+
             if (input === claveCorrecta) {
                 document.getElementById("login").style.display = "none";
                 document.getElementById("app").style.display = "block";
@@ -96,7 +99,6 @@
                 document.getElementById("pass").value = "";
             }
         }
-
         // Permite entrar también presionando la tecla Enter
         function checkEnter(e) {
             if (e.key === 'Enter') {
