@@ -1,0 +1,108 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Gestión de Viajes 2.1</title>
+    <style>
+        body, html { 
+            margin: 0; 
+            padding: 0; 
+            height: 100%; 
+            background-color: #f4f4f9; 
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; 
+        }
+        iframe { 
+            width: 100%; 
+            height: 100%; 
+            border: none; 
+            display: none; /* Oculto hasta que pongan la clave */
+        } 
+        .login-container { 
+            display: flex; 
+            flex-direction: column; 
+            align-items: center; 
+            justify-content: center; 
+            height: 100vh; 
+        }
+        .login-box {
+            background: white;
+            padding: 30px;
+            border-radius: 8px;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.1);
+            text-align: center;
+            max-width: 350px;
+            width: 100%;
+        }
+        h3 { margin-top: 0; color: #333; }
+        input { 
+            width: 85%; 
+            padding: 12px; 
+            margin: 10px 0; 
+            font-size: 16px; 
+            border-radius: 5px; 
+            border: 1px solid #ccc; 
+            outline: none;
+        }
+        button { 
+            width: 93%;
+            padding: 12px; 
+            font-size: 16px; 
+            font-weight: bold;
+            border-radius: 5px; 
+            background-color: #546E7A;    /* Nuevo color */
+            color: white; 
+            cursor: pointer; 
+            border: none; 
+            transition: background 0.2s;
+        }
+        button:hover { 
+            background-color: #3f4f5f;    /* Tono más oscuro para el hover */
+        }
+        .error-msg { color: red; font-size: 14px; margin-top: 10px; display: none; }
+    </style>
+</head>
+<body>
+
+    <div id="login" class="login-container">
+        <div class="login-box">
+            <h3>Sistema de Gestión</h3>
+            <p style="color: #666; font-size: 14px;">Introduce tus credenciales para acceder</p>
+            <!-- Nuevo campo usuario con valor por defecto -->
+            <input type="text" id="user" value="Administrador" placeholder="Usuario">
+            <input type="password" id="pass" placeholder="Contraseña" onkeypress="checkEnter(event)">
+            <button onclick="validar()">Ingresar</button>
+            <div id="error" class="error-msg">Contraseña incorrecta</div>
+        </div>
+    </div>
+
+    <iframe id="app" src="https://script.google.com/macros/s/AKfycbw5I2YkPoS_lOtP70JhBNnoMQPWa56N2IKUhNjBqmmBvqkETMd3rNKQLFftP9HQf7_ExA/exec"></iframe>
+
+    <script>
+        function validar() {
+            // ========================================================
+            //  CAMBIA EL TEXTO DE ABAJO POR LA CLAVE QUE TÚ QUIERAS
+            // ========================================================
+            var claveCorrecta = "asd"; 
+            
+            var input = document.getElementById("pass").value;
+            var errorDiv = document.getElementById("error");
+            
+            if (input === claveCorrecta) {
+                document.getElementById("login").style.display = "none";
+                document.getElementById("app").style.display = "block";
+            } else {
+                errorDiv.style.display = "block";
+                document.getElementById("pass").value = "";
+            }
+        }
+
+        // Permite entrar también presionando la tecla Enter
+        function checkEnter(e) {
+            if (e.key === 'Enter') {
+                validar();
+            }
+        }
+    </script>
+</body>
+</html>
