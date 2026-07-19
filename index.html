@@ -12,12 +12,6 @@
             background-color: #f4f4f9;
             font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
         }
-        iframe {
-            width: 100%;
-            height: 100%;
-            border: none;
-            display: none; /* Oculto hasta que pongan la clave */
-        }
         .login-container {
             display: flex;
             flex-direction: column;
@@ -74,14 +68,10 @@
             <div id="error" class="error-msg">Contraseña incorrecta</div>
         </div>
     </div>
-    <!--
-      Se agregó el atributo "allow" para delegar permiso de micrófono (y de
-      reconocimiento de voz) al contenido embebido del formulario. Sin esto,
-      el navegador bloquea getUserMedia/SpeechRecognition dentro del iframe
-      aunque el usuario haya aceptado el permiso en Safari.
-    -->
-    <iframe id="app" src="https://script.google.com/macros/s/AKfycbxZY420VyRMw1saj0SrDaugcl8VKAcAu1FCrGPKclAZssPTlonOUwTg82Gr61gVvJEn5w/exec" allow="microphone *; speech-recognition *"></iframe>
     <script>
+        // URL del formulario (Apps Script Web App)
+        var APP_URL = "https://script.google.com/macros/s/AKfycbxZY420VyRMw1saj0SrDaugcl8VKAcAu1FCrGPKclAZssPTlonOUwTg82Gr61gVvJEn5w/exec";
+
         function validar() {
             // ========================================================
             //  CAMBIA EL TEXTO DE ABAJO POR LA CLAVE QUE TÚ QUIERAS
@@ -92,8 +82,15 @@
             var errorDiv = document.getElementById("error");
 
             if (input === claveCorrecta) {
-                document.getElementById("login").style.display = "none";
-                document.getElementById("app").style.display = "block";
+                // Navegamos a la página completa (NO dentro de un iframe).
+                // Esto es necesario para que el micrófono funcione: dentro de
+                // un iframe (incluso con "allow") Google vuelve a envolver el
+                // contenido en otro iframe interno que no podemos permisar,
+                // y el navegador bloquea getUserMedia/SpeechRecognition.
+                // Al navegar directo, el formulario pasa a ser la página
+                // principal de la pestaña y el permiso de micrófono se pide
+                // de forma normal.
+                window.location.href = APP_URL;
             } else {
                 errorDiv.style.display = "block";
                 document.getElementById("pass").value = "";
