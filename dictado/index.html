@@ -104,11 +104,6 @@
     <div class="buttons">
       <button id="startBtn" class="btn-primary">🎤 Iniciar dictado</button>
       <button id="stopBtn" class="btn-secondary" disabled>⏹ Detener</button>
-      <button id="clearBtn" class="btn-secondary">✕ Borrar texto</button>
-    </div>
-    <div class="buttons">
-      <button id="sendBtn" class="btn-success">✔ Usar este texto y cerrar</button>
-      <button id="cancelBtn" class="btn-danger">Cancelar sin enviar</button>
     </div>
   </div>
 
@@ -123,14 +118,25 @@
     const statusEl = document.getElementById('status');
     const startBtn = document.getElementById('startBtn');
     const stopBtn = document.getElementById('stopBtn');
-    const clearBtn = document.getElementById('clearBtn');
-    const sendBtn = document.getElementById('sendBtn');
-    const cancelBtn = document.getElementById('cancelBtn');
     const textarea = document.getElementById('transcript');
 
     let recognition = null;
     let listening = false;
     let baseText = '';
+    let shouldCloseOnEnd = false;
+
+    function sendAndClose() {
+      const text = textarea.value.trim();
+      if (window.opener) {
+        window.opener.postMessage({
+          type: 'dictado-transcript',
+          field: fieldToken,
+          text: text
+        }, openerOrigin);
+      }
+      setStatus('Texto enviado. Cerrando...', 'ok');
+      setTimeout(() => window.close(), 300);
+    }
 
     function setStatus(text, cls) {
       statusEl.textContent = text;
@@ -150,6 +156,7 @@
 
     startBtn.addEventListener('click', () => {
       if (!SpeechRecognitionImpl) return;
+      shouldCloseOnEnd = false;
       recognition = new SpeechRecognitionImpl();
       recognition.lang = 'es-UY';
       recognition.continuous = true;
@@ -197,10 +204,14 @@
 
       recognition.onend = () => {
         listening = false;
-        startBtn.disabled = false;
-        stopBtn.disabled = true;
-        if (!statusEl.classList.contains('error')) {
-          setStatus('Dictado detenido. Podés revisar el texto, seguir dictando o enviarlo.', 'ok');
+        if (shouldCloseOnEnd) {
+          sendAndClose();
+        } else {
+          startBtn.disabled = false;
+          stopBtn.disabled = true;
+          if (!statusEl.classList.contains('error')) {
+            setStatus('Dictado en pausa.', 'ok');
+          }
         }
       };
 
@@ -212,31 +223,14 @@
     });
 
     stopBtn.addEventListener('click', () => {
-      if (recognition && listening) recognition.stop();
-    });
-
-    clearBtn.addEventListener('click', () => {
-      textarea.value = '';
-      baseText = '';
-    });
-
-    sendBtn.addEventListener('click', () => {
-      if (recognition && listening) recognition.stop();
-      const text = textarea.value.trim();
-      if (window.opener) {
-        window.opener.postMessage({
-          type: 'dictado-transcript',
-          field: fieldToken,
-          text: text
-        }, openerOrigin);
+      if (recognition && listening) {
+        shouldCloseOnEnd = true;
+        stopBtn.disabled = true;
+        setStatus('Finalizando...', 'listening');
+        recognition.stop();
+      } else {
+        sendAndClose();
       }
-      setStatus('Texto enviado. Cerrando...', 'ok');
-      setTimeout(() => window.close(), 400);
-    });
-
-    cancelBtn.addEventListener('click', () => {
-      if (recognition && listening) recognition.stop();
-      window.close();
     });
 
     window.addEventListener('beforeunload', () => {
