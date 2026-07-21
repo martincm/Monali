@@ -5,25 +5,25 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Sistema de Gestión</title>
     <style>
-        body, html { 
-            margin: 0; 
-            padding: 0; 
-            height: 100%; 
-            background-color: #f4f4f9; 
-            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; 
+        body, html {
+            margin: 0;
+            padding: 0;
+            height: 100%;
+            background-color: #f4f4f9;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
         }
-        iframe { 
-            width: 100%; 
-            height: 100%; 
-            border: none; 
+        iframe {
+            width: 100%;
+            height: 100%;
+            border: none;
             display: none; /* Oculto hasta que pongan la clave */
-        } 
-        .login-container { 
-            display: flex; 
-            flex-direction: column; 
-            align-items: center; 
-            justify-content: center; 
-            height: 100vh; 
+        }
+        .login-container {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            height: 100vh;
         }
         .login-box {
             background: white;
@@ -35,35 +35,99 @@
             width: 100%;
         }
         h3 { margin-top: 0; color: #333; }
-        input { 
-            width: 85%; 
-            padding: 12px; 
-            margin: 10px 0; 
-            font-size: 16px; 
-            border-radius: 5px; 
-            border: 1px solid #ccc; 
+        input {
+            width: 85%;
+            padding: 12px;
+            margin: 10px 0;
+            font-size: 16px;
+            border-radius: 5px;
+            border: 1px solid #ccc;
             outline: none;
         }
-        button { 
+        button {
             width: 93%;
-            padding: 12px; 
-            font-size: 16px; 
+            padding: 12px;
+            font-size: 16px;
             font-weight: bold;
-            border-radius: 5px; 
+            border-radius: 5px;
             background-color: #546E7A;    /* Nuevo color */
-            color: white; 
-            cursor: pointer; 
-            border: none; 
+            color: white;
+            cursor: pointer;
+            border: none;
             transition: background 0.2s;
         }
-        button:hover { 
+        button:hover {
             background-color: #3f4f5f;    /* Tono más oscuro para el hover */
         }
         .error-msg { color: red; font-size: 14px; margin-top: 10px; display: none; }
+
+        /* ===== Modal de dictado por voz ===== */
+        #dictOverlay {
+            display: none;
+            position: fixed;
+            inset: 0;
+            background: rgba(0,0,0,0.45);
+            z-index: 9999;
+            align-items: center;
+            justify-content: center;
+            padding: 16px;
+            box-sizing: border-box;
+        }
+        #dictOverlay.show { display: flex; }
+        .dict-box {
+            background: white;
+            border-radius: 10px;
+            max-width: 420px;
+            width: 100%;
+            padding: 16px;
+            box-shadow: 0 8px 24px rgba(0,0,0,0.25);
+        }
+        .dict-box h4 {
+            margin: 0 0 4px 0;
+            color: #546E7A;
+            font-size: 1.05rem;
+        }
+        .dict-box p {
+            margin: 0 0 12px 0;
+            font-size: 0.85rem;
+            color: #6c757d;
+        }
+        #dictTranscript {
+            width: 100%;
+            min-height: 120px;
+            resize: vertical;
+            border: 1px solid #ced4da;
+            border-radius: 8px;
+            padding: 10px;
+            font-size: 1rem;
+            font-family: inherit;
+            box-sizing: border-box;
+        }
+        #dictStatus {
+            margin: 8px 0;
+            font-size: 0.9rem;
+            min-height: 1.2em;
+        }
+        #dictStatus.listening { color: #c62828; font-weight: 600; }
+        #dictStatus.error { color: #c62828; }
+        #dictStatus.ok { color: #2e7d32; }
+        .dict-buttons {
+            display: flex;
+            gap: 8px;
+            margin-top: 8px;
+        }
+        .dict-buttons button {
+            width: auto;
+            flex: 1;
+            padding: 10px;
+            font-size: 0.95rem;
+        }
+        #dictStartBtn { background: #546E7A; }
+        #dictStopBtn { background: #e9ecef; color: #212529; }
+        #dictStopBtn:disabled, #dictStartBtn:disabled { opacity: 0.5; cursor: not-allowed; }
     </style>
 </head>
 <body>
-
     <div id="login" class="login-container">
         <div class="login-box">
             <h3>Sistema de Gestión</h3>
@@ -75,34 +139,203 @@
             <div id="error" class="error-msg">Contraseña incorrecta</div>
         </div>
     </div>
-
     <iframe id="app" src="https://script.google.com/macros/s/AKfycby-wPgktOx02z0RByalJEakOhSMIEsU_KSfz9gwQq0DaHTcTqT_tPPulVIW54z5r5mWPg/exec"></iframe>
 
+    <!-- Modal de dictado por voz: corre en esta página (nivel superior, sin
+         restricciones de micrófono), no en una ventana aparte. -->
+    <div id="dictOverlay">
+        <div class="dict-box">
+            <h4>🎙️ Dictado por voz</h4>
+            <p>Hablá y despues tocá "Detener". El texto se manda solo al campo del formulario.</p>
+            <textarea id="dictTranscript" placeholder="El texto dictado aparecerá aquí. También podés escribir a mano."></textarea>
+            <div id="dictStatus">Listo para empezar.</div>
+            <div class="dict-buttons">
+                <button id="dictStartBtn">🎤 Iniciar dictado</button>
+                <button id="dictStopBtn" disabled>⏹ Detener</button>
+            </div>
+        </div>
+    </div>
+
     <script>
+        // ================= LOGIN =================
+        var claveCorrecta = "asd";
+
+        function mostrarApp() {
+            document.getElementById("login").style.display = "none";
+            document.getElementById("app").style.display = "block";
+        }
+
         function validar() {
-            // ========================================================
-            //  CAMBIA EL TEXTO DE ABAJO POR LA CLAVE QUE TÚ QUIERAS
-            // ========================================================
-            var claveCorrecta = "Sandro.26"; 
-            
             var input = document.getElementById("pass").value;
             var errorDiv = document.getElementById("error");
-            
+
             if (input === claveCorrecta) {
-                document.getElementById("login").style.display = "none";
-                document.getElementById("app").style.display = "block";
+                // Recordamos el acceso mientras esta pestaña siga abierta,
+                // por si el navegador la recarga en segundo plano.
+                try { sessionStorage.setItem("gvAuth", "1"); } catch (e) {}
+                mostrarApp();
             } else {
                 errorDiv.style.display = "block";
                 document.getElementById("pass").value = "";
             }
         }
 
-        // Permite entrar también presionando la tecla Enter
         function checkEnter(e) {
             if (e.key === 'Enter') {
                 validar();
             }
         }
+
+        (function() {
+            try {
+                if (sessionStorage.getItem("gvAuth") === "1") {
+                    mostrarApp();
+                }
+            } catch (e) {}
+        })();
+
+        // ================= DICTADO POR VOZ =================
+        // El formulario (adentro del iframe) no puede usar el micrófono
+        // porque Apps Script lo sirve en un contexto restringido. Como esta
+        // página SÍ es de nivel superior (sin esa restricción), hacemos acá
+        // el reconocimiento de voz cuando el formulario lo pide, y le
+        // devolvemos el texto. Así nunca se abre una ventana nueva ni se
+        // recarga nada.
+
+        const appFrame = document.getElementById('app');
+        const dictOverlay = document.getElementById('dictOverlay');
+        const dictTranscript = document.getElementById('dictTranscript');
+        const dictStatus = document.getElementById('dictStatus');
+        const dictStartBtn = document.getElementById('dictStartBtn');
+        const dictStopBtn = document.getElementById('dictStopBtn');
+
+        let dictRecognition = null;
+        let dictListening = false;
+        let dictBaseText = '';
+        let dictShouldCloseOnEnd = false;
+        let dictPending = null; // { field, origin }
+
+        const SpeechRecognitionImpl = window.SpeechRecognition || window.webkitSpeechRecognition;
+
+        function setDictStatus(text, cls) {
+            dictStatus.textContent = text;
+            dictStatus.className = cls || '';
+        }
+
+        function abrirDictado() {
+            dictTranscript.value = '';
+            dictBaseText = '';
+            setDictStatus('Listo para empezar.');
+            dictStartBtn.disabled = false;
+            dictStopBtn.disabled = true;
+            dictOverlay.classList.add('show');
+            if (!SpeechRecognitionImpl) {
+                setDictStatus('Este navegador no soporta reconocimiento de voz. Probá con Chrome.', 'error');
+                dictStartBtn.disabled = true;
+            }
+        }
+
+        function cerrarDictadoYEnviar() {
+            const texto = dictTranscript.value.trim();
+            if (dictPending) {
+                appFrame.contentWindow.postMessage({
+                    type: 'dictado-transcript',
+                    field: dictPending.field,
+                    text: texto
+                }, dictPending.origin);
+            }
+            dictOverlay.classList.remove('show');
+            dictPending = null;
+        }
+
+        dictStartBtn.addEventListener('click', () => {
+            if (!SpeechRecognitionImpl) return;
+            dictShouldCloseOnEnd = false;
+            dictRecognition = new SpeechRecognitionImpl();
+            dictRecognition.lang = 'es-UY';
+            dictRecognition.continuous = true;
+            dictRecognition.interimResults = true;
+
+            dictBaseText = dictTranscript.value ? dictTranscript.value.trim() + ' ' : '';
+
+            dictRecognition.onstart = () => {
+                dictListening = true;
+                dictStartBtn.disabled = true;
+                dictStopBtn.disabled = false;
+                setDictStatus('● Escuchando... hable con claridad.', 'listening');
+            };
+
+            dictRecognition.onresult = (event) => {
+                let finalText = '';
+                let interimText = '';
+                for (let i = event.resultIndex; i < event.results.length; i++) {
+                    const t = event.results[i][0].transcript;
+                    if (event.results[i].isFinal) {
+                        finalText += t + ' ';
+                    } else {
+                        interimText += t;
+                    }
+                }
+                if (finalText) {
+                    dictBaseText = (dictBaseText + finalText).trim() + ' ';
+                }
+                dictTranscript.value = (dictBaseText + interimText).trim();
+            };
+
+            dictRecognition.onerror = (event) => {
+                let msg = 'Error de reconocimiento de voz.';
+                if (event.error === 'not-allowed' || event.error === 'service-not-allowed') {
+                    msg = 'Permiso de micrófono denegado. Revisá el ícono de micrófono en la barra de direcciones.';
+                } else if (event.error === 'no-speech') {
+                    msg = 'No se detectó voz.';
+                } else if (event.error === 'network') {
+                    msg = 'Error de red durante el reconocimiento.';
+                } else if (event.error === 'aborted') {
+                    return;
+                }
+                setDictStatus(msg, 'error');
+            };
+
+            dictRecognition.onend = () => {
+                dictListening = false;
+                if (dictShouldCloseOnEnd) {
+                    cerrarDictadoYEnviar();
+                } else {
+                    dictStartBtn.disabled = false;
+                    dictStopBtn.disabled = true;
+                    if (dictStatus.className !== 'error') {
+                        setDictStatus('Dictado en pausa.', 'ok');
+                    }
+                }
+            };
+
+            try {
+                dictRecognition.start();
+            } catch (e) {
+                setDictStatus('No se pudo iniciar el dictado: ' + e.message, 'error');
+            }
+        });
+
+        dictStopBtn.addEventListener('click', () => {
+            if (dictRecognition && dictListening) {
+                dictShouldCloseOnEnd = true;
+                dictStopBtn.disabled = true;
+                setDictStatus('Finalizando...', 'listening');
+                dictRecognition.stop();
+            } else {
+                cerrarDictadoYEnviar();
+            }
+        });
+
+        window.addEventListener('message', function(event) {
+            // Solo aceptamos pedidos de dictado que vengan realmente del iframe del formulario
+            if (event.source !== appFrame.contentWindow) return;
+            const data = event.data;
+            if (!data || data.type !== 'dictado-abrir') return;
+
+            dictPending = { field: data.field, origin: event.origin };
+            abrirDictado();
+        });
     </script>
 </body>
 </html>
