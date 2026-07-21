@@ -1,0 +1,249 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Dictado por voz</title>
+<style>
+  :root {
+    --primary-color: #546E7A;
+    --primary-dark: #455a64;
+  }
+  * { box-sizing: border-box; }
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Arial, sans-serif;
+    background: #f8f9fa;
+    color: #212529;
+    margin: 0;
+    padding: 20px;
+    display: flex;
+    flex-direction: column;
+    min-height: 100vh;
+  }
+  h1 {
+    font-size: 1.1rem;
+    color: var(--primary-color);
+    margin: 0 0 4px 0;
+  }
+  p.hint {
+    font-size: 0.85rem;
+    color: #6c757d;
+    margin: 0 0 16px 0;
+  }
+  .box {
+    background: white;
+    border: 1px solid #dee2e6;
+    border-radius: 10px;
+    padding: 14px;
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+  }
+  textarea {
+    width: 100%;
+    flex: 1;
+    min-height: 140px;
+    resize: vertical;
+    border: 1px solid #ced4da;
+    border-radius: 8px;
+    padding: 10px;
+    font-size: 1rem;
+    font-family: inherit;
+  }
+  .status {
+    margin: 10px 0;
+    font-size: 0.9rem;
+    min-height: 1.3em;
+  }
+  .status.listening { color: #c62828; font-weight: 600; }
+  .status.error { color: #c62828; }
+  .status.ok { color: #2e7d32; }
+  .buttons {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    margin-top: 12px;
+  }
+  button {
+    border: none;
+    border-radius: 8px;
+    padding: 10px 16px;
+    font-size: 0.95rem;
+    cursor: pointer;
+    flex: 1;
+    min-width: 120px;
+  }
+  .btn-primary { background: var(--primary-color); color: white; }
+  .btn-primary:hover { background: var(--primary-dark); }
+  .btn-danger { background: #dc3545; color: white; }
+  .btn-success { background: #2e7d32; color: white; }
+  .btn-secondary { background: #e9ecef; color: #212529; }
+  button:disabled { opacity: 0.5; cursor: not-allowed; }
+  .dot {
+    display: inline-block;
+    width: 10px; height: 10px;
+    border-radius: 50%;
+    background: #dc3545;
+    margin-right: 6px;
+    animation: pulse 1.2s infinite;
+  }
+  @keyframes pulse {
+    0% { box-shadow: 0 0 0 0 rgba(220,53,69,.5); }
+    70% { box-shadow: 0 0 0 8px rgba(220,53,69,0); }
+    100% { box-shadow: 0 0 0 0 rgba(220,53,69,0); }
+  }
+</style>
+</head>
+<body>
+  <h1>🎙️ Dictado por voz</h1>
+  <p class="hint">Esta ventana corre fuera del formulario para poder usar el micrófono. Al terminar, el texto se envía automáticamente al campo original.</p>
+
+  <div class="box">
+    <textarea id="transcript" placeholder="El texto dictado aparecerá aquí. También podés escribir o corregir a mano."></textarea>
+    <div class="status" id="status">Listo para empezar.</div>
+    <div class="buttons">
+      <button id="startBtn" class="btn-primary">🎤 Iniciar dictado</button>
+      <button id="stopBtn" class="btn-secondary" disabled>⏹ Detener</button>
+      <button id="clearBtn" class="btn-secondary">✕ Borrar texto</button>
+    </div>
+    <div class="buttons">
+      <button id="sendBtn" class="btn-success">✔ Usar este texto y cerrar</button>
+      <button id="cancelBtn" class="btn-danger">Cancelar sin enviar</button>
+    </div>
+  </div>
+
+  <script>
+    // Origen de la página que abrió este popup (Apps Script). Se pasa por
+    // query string para poder usar postMessage con targetOrigin exacto en
+    // vez de '*'. Si no viene, se usa '*' como respaldo (menos estricto).
+    const params = new URLSearchParams(window.location.search);
+    const openerOrigin = params.get('origin') || '*';
+    const fieldToken = params.get('field') || '';
+
+    const statusEl = document.getElementById('status');
+    const startBtn = document.getElementById('startBtn');
+    const stopBtn = document.getElementById('stopBtn');
+    const clearBtn = document.getElementById('clearBtn');
+    const sendBtn = document.getElementById('sendBtn');
+    const cancelBtn = document.getElementById('cancelBtn');
+    const textarea = document.getElementById('transcript');
+
+    let recognition = null;
+    let listening = false;
+    let baseText = '';
+
+    function setStatus(text, cls) {
+      statusEl.textContent = text;
+      statusEl.className = 'status' + (cls ? ' ' + cls : '');
+    }
+
+    const SpeechRecognitionImpl = window.SpeechRecognition || window.webkitSpeechRecognition;
+
+    if (!window.opener) {
+      setStatus('Aviso: esta ventana no tiene una ventana de origen (opener). Abrila haciendo clic en el botón "Dictar" del formulario, no pegando la URL directamente.', 'error');
+    }
+
+    if (!SpeechRecognitionImpl) {
+      setStatus('Este navegador no soporta reconocimiento de voz. Probá con Chrome.', 'error');
+      startBtn.disabled = true;
+    }
+
+    startBtn.addEventListener('click', () => {
+      if (!SpeechRecognitionImpl) return;
+      recognition = new SpeechRecognitionImpl();
+      recognition.lang = 'es-UY';
+      recognition.continuous = true;
+      recognition.interimResults = true;
+
+      baseText = textarea.value ? textarea.value.trim() + ' ' : '';
+
+      recognition.onstart = () => {
+        listening = true;
+        startBtn.disabled = true;
+        stopBtn.disabled = false;
+        setStatus('● Escuchando... hable con claridad.', 'listening');
+      };
+
+      recognition.onresult = (event) => {
+        let finalText = '';
+        let interimText = '';
+        for (let i = event.resultIndex; i < event.results.length; i++) {
+          const t = event.results[i][0].transcript;
+          if (event.results[i].isFinal) {
+            finalText += t + ' ';
+          } else {
+            interimText += t;
+          }
+        }
+        if (finalText) {
+          baseText = (baseText + finalText).trim() + ' ';
+        }
+        textarea.value = (baseText + interimText).trim();
+      };
+
+      recognition.onerror = (event) => {
+        let msg = 'Error de reconocimiento de voz.';
+        if (event.error === 'not-allowed' || event.error === 'service-not-allowed') {
+          msg = 'Permiso de micrófono denegado en esta ventana. Revisá el ícono de micrófono en la barra de direcciones del navegador.';
+        } else if (event.error === 'no-speech') {
+          msg = 'No se detectó voz.';
+        } else if (event.error === 'network') {
+          msg = 'Error de red durante el reconocimiento.';
+        } else if (event.error === 'aborted') {
+          return;
+        }
+        setStatus(msg, 'error');
+      };
+
+      recognition.onend = () => {
+        listening = false;
+        startBtn.disabled = false;
+        stopBtn.disabled = true;
+        if (!statusEl.classList.contains('error')) {
+          setStatus('Dictado detenido. Podés revisar el texto, seguir dictando o enviarlo.', 'ok');
+        }
+      };
+
+      try {
+        recognition.start();
+      } catch (e) {
+        setStatus('No se pudo iniciar el dictado: ' + e.message, 'error');
+      }
+    });
+
+    stopBtn.addEventListener('click', () => {
+      if (recognition && listening) recognition.stop();
+    });
+
+    clearBtn.addEventListener('click', () => {
+      textarea.value = '';
+      baseText = '';
+    });
+
+    sendBtn.addEventListener('click', () => {
+      if (recognition && listening) recognition.stop();
+      const text = textarea.value.trim();
+      if (window.opener) {
+        window.opener.postMessage({
+          type: 'dictado-transcript',
+          field: fieldToken,
+          text: text
+        }, openerOrigin);
+      }
+      setStatus('Texto enviado. Cerrando...', 'ok');
+      setTimeout(() => window.close(), 400);
+    });
+
+    cancelBtn.addEventListener('click', () => {
+      if (recognition && listening) recognition.stop();
+      window.close();
+    });
+
+    window.addEventListener('beforeunload', () => {
+      if (recognition && listening) {
+        try { recognition.stop(); } catch (e) {}
+      }
+    });
+  </script>
+</body>
+</html>
